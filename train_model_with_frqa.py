@@ -8,12 +8,6 @@ from tqdm.auto import tqdm
 from datasets import load_dataset
 
 dataset = load_dataset("CATIE-AQ/frenchQA")
-
-# print elements in dataset to test if all works
-# print("Context: ", dataset["train"][10]["context"])
-# print("Question: ", dataset["train"][10]["question"])
-# print("Answer: ", dataset["train"][10]["answers"])
-
 model_checkpoint = "distilbert/distilbert-base-multilingual-cased"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
@@ -173,6 +167,7 @@ def postprocess_qa_predictions(
 			
 	return predictions
 
+# Use these functions to configure the train_dataset and validation_dataset
 
 train_dataset = dataset["train"].map(
 	preprocess_train,
@@ -181,13 +176,12 @@ train_dataset = dataset["train"].map(
 )
 train_dataset = train_dataset.shard(num_shards=40, index=0)
 
-validation_dataset = dataset["test"].map(
+validation_dataset = dataset["validation"].map(
 	preprocess_validation_examples,
 	batched=True,
-	remove_columns=dataset["test"].column_names,
+	remove_columns=dataset["validation"].column_names,
 )
-validation_dataset = validation_dataset.shard(num_shards=40, index=0)
-validation_dataset.save_to_disk("data")
+validation_dataset = validation_dataset
 
 model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
 
@@ -206,7 +200,7 @@ squad_metric = evaluate.load("squad")
 def compute_metrics(p):
 
 	predicted_char_answers = postprocess_qa_predictions(
-		dataset["test"],     # Original examples from the test set
+		dataset["validation"],     # Original examples from the validation set
 		validation_dataset,  # Processed features (output of .map(preprocess_validation_examples))
 		p.predictions,       # Tuple of (start_logits, end_logits)
 		tokenizer,
@@ -214,7 +208,7 @@ def compute_metrics(p):
 	)
 
 	formatted_references = [
-		{"id": ex["id"], "answers": ex["answers"]} for ex in dataset["test"]
+		{"id": ex["id"], "answers": ex["answers"]} for ex in dataset["validation"]
 	]
 	
 	# Convert predicted_answers (OrderedDict) to list of dicts for SQuAD metric

@@ -238,6 +238,3 @@ trainer = Trainer(
 
 trainer.train()
 trainer.save_model("./qa_model_final")
-
-eval_results = trainer.evaluate()
-print(eval_results)

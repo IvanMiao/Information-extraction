@@ -3,6 +3,7 @@ import os
 import glob
 import json
 import re
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 api_key = os.environ["GEMINI_API_KEY"]
 client = genai.Client(api_key=api_key)
@@ -17,8 +18,7 @@ def read_md_files(directory):
 			content = f.read()
 			documents.append({
 				"filename":os.path.basename(file_path),
-				"content":content,
-				"paragraph": None
+				"content":content
 			})
 
 	return (documents)
@@ -75,64 +75,52 @@ def process_res_text(text: str):
 	
 	return parsed_pairs
 
+def main():
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-text_splitter = RecursiveCharacterTextSplitter(
-	chunk_size=1000, chunk_overlap=100, add_start_index=True
-)
+	# use langchain to split chunks
+	text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100, add_start_index=True)
 
-docs_directory = "local_doc"
-documents = read_md_files(docs_directory)
-min_len = 30
+	docs_directory = "local_doc"
+	documents = read_md_files(docs_directory)
+	min_len = 30
 
-# Generate and save QA pairs for each document
-qa_pairs_by_document = {}
+	# Generate and save QA pairs for each document
+	all_qa_entries = []
 
-all_qa_entries = []
+	for doc in documents:
+		print(f"Processing: {doc['filename']}")
+		all_chunks = text_splitter.split_text(doc['content'])
 
-for doc in documents:
-	print(f"Processing: {doc['filename']}")
-	all_chunks = text_splitter.split_text(doc['content'])
+		print(f"Number of chunks for {doc['filename']}: {len(all_chunks)}")
 
-	qa_pairs_by_document[doc['filename']] = {}
-	print(f"Number of chunks for {doc['filename']}: {len(all_chunks)}")
+		chunk_index = 0
+		for paragraph in all_chunks:
+			if (len(paragraph) < min_len): # if the chunk is too small, ignore it 
+				continue
+			qa_pairs = generate_qa_pairs(paragraph, 1)
+			with open("raw_qa_pairs", 'a') as f:
+				f.write(qa_pairs + '\n\n----------\n\n')
+			qa_pairs = process_res_text(qa_pairs)
 
-	chunk_index = 0
-	for paragraph in all_chunks:
-		if (len(paragraph) < min_len):
-			continue
-		qa_pairs = generate_qa_pairs(paragraph, 1)
-		with open("raw", 'a') as f:
-			f.write(qa_pairs + '\n\n----------\n\n')
-		qa_pairs = process_res_text(qa_pairs)
-		
-		qa_pairs_by_document[doc['filename']][chunk_index] = {
-			"context": paragraph,
-			"qa_pairs": qa_pairs
-		}
+			for pair in qa_pairs:
+				all_qa_entries.append({
+					"context": paragraph,
+					"question": pair["question"],
+					"answers": {
+						"text": [pair["answer"]["text"]],
+						"answer_start": [pair["answer"]["answer_start"]]
+					},
+					"id": f"{doc['filename']}_{chunk_index}_{len(all_qa_entries)}"
+				})
+			chunk_index += 1
 
-		for pair in qa_pairs:
-			all_qa_entries.append({
-				"context": paragraph,
-				"question": pair["question"],
-				"answers": {
-					"text": [pair["answer"]["text"]],
-					"answer_start": [pair["answer"]["answer_start"]]
-				},
-				"id": f"{doc['filename']}_{chunk_index}_{len(all_qa_entries)}"
-			})
-		chunk_index += 1
+	# Save dataset to a JSON file
+	hf_output_file = "corpus/hf_dataset_qa_pairs.json"
+	with open(hf_output_file, 'w', encoding='utf-8') as f:
+		json.dump({"data": all_qa_entries}, f, indent=2)
 
-# Save results to a JSON file
-output_file = "corpus/document_qa_pairs.json"
-with open(output_file, 'w', encoding='utf-8') as f:
-	json.dump(qa_pairs_by_document, f, indent=2)
+	print(f"HuggingFace-ready dataset saved to {hf_output_file}")
 
-print(f"QA pairs generated and saved to {output_file}")
+if __name__ == "__main__":
+	main()
 
-# Save dataset to a JSON file
-hf_output_file = "corpus/hf_dataset_qa_pairs.json"
-with open(hf_output_file, 'w', encoding='utf-8') as f:
-    json.dump({"data": all_qa_entries}, f, indent=2)
-
-print(f"HuggingFace-ready dataset saved to {hf_output_file}")
