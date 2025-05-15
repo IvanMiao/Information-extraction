@@ -7,15 +7,17 @@ from tqdm.auto import tqdm
 
 from datasets import load_dataset
 
+# Chargement du jeu de données en français et du modèle pré-entraîné
 dataset = load_dataset("CATIE-AQ/frenchQA")
 model_checkpoint = "distilbert/distilbert-base-multilingual-cased"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
 def preprocess_train(example):
+	"""Prétraitement des exemples d'entraînement avec gestion des positions de réponses"""
 	context = example["context"]
 	question = [q.strip() for q in example["question"]]
 
-	# configure tokenizer to fit the task
+	# configuration du tokenizer pour la tache
 	input = tokenizer(
 		question,
 		context,
@@ -76,6 +78,7 @@ def preprocess_train(example):
 
 
 def preprocess_validation_examples(example):
+	"""Prétraitement des exemples de validation avec gestion des identifiants"""
 	context = example["context"]
 	questions = [q.strip() for q in example["question"]]
 
@@ -117,6 +120,7 @@ def postprocess_qa_predictions(
 	max_answer_length=30,
 	squad_v2=False
 ):
+	"""Post-traitement des prédictions pour extraire les réponses textuelles"""
 	example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
 	features_per_example = collections.defaultdict(list)
 	for i, feature in enumerate(features):
@@ -167,14 +171,13 @@ def postprocess_qa_predictions(
 			
 	return predictions
 
-# Use these functions to configure the train_dataset and validation_dataset
-
+# Préparation des jeux de données d'entraînement et de validation
 train_dataset = dataset["train"].map(
 	preprocess_train,
 	batched=True,
 	remove_columns=dataset["train"].column_names,
 )
-train_dataset = train_dataset.shard(num_shards=40, index=0)
+train_dataset = train_dataset.shard(num_shards=40, index=0)  # Utilisation d'un sous-ensemble pour l'entraînement
 
 validation_dataset = dataset["validation"].map(
 	preprocess_validation_examples,
@@ -183,8 +186,10 @@ validation_dataset = dataset["validation"].map(
 )
 validation_dataset = validation_dataset
 
+# Initialisation du modèle de question-réponse
 model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
 
+# Configuration des paramètres d'entraînement
 training_args = TrainingArguments(
 	"qa_model",
 	learning_rate=2e-5,
@@ -195,10 +200,11 @@ training_args = TrainingArguments(
 	#use_cpu=True,
 )
 
+# Chargement de la métrique d'évaluation SQuAD
 squad_metric = evaluate.load("squad")
 
 def compute_metrics(p):
-
+	"""Calcul des métriques d'évaluation pour le modèle (fournie par Huggingface)"""
 	predicted_char_answers = postprocess_qa_predictions(
 		dataset["validation"],     # Original examples from the validation set
 		validation_dataset,  # Processed features (output of .map(preprocess_validation_examples))
@@ -218,7 +224,7 @@ def compute_metrics(p):
 
 	return squad_metric.compute(predictions=predictions_for_metric, references=formatted_references)
 
-
+# Configuration et lancement de l'entraînement
 trainer = Trainer(
 	model=model,
 	args=training_args,
@@ -228,5 +234,6 @@ trainer = Trainer(
 	compute_metrics=compute_metrics,
 	)
 
+# Entraînement et sauvegarde du modèle
 trainer.train()
 trainer.save_model("./qa_model_final")

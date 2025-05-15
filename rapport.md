@@ -2,6 +2,7 @@
 
 ## Introduction
 
+Ce projet vise à développer un système de questions-réponses (QA) pour la langue française. Une part de ce travail a consisté à expérimenter la génération automatique de paires question-réponse. Pour ce faire, on a mis en œuvre un pipeline complet : conversion de documents PDF au format Markdown par reconnaissance optique de caractères (OCR), segmentation (chunking) des textes obtenus, puis utilisation d'un grand modèle de langage (LLM) pour générer les paires QA, qui ont ensuite été structurées en un corpus compatible avec les datasets Hugging Face. En parallèle, un modèle de QA pré-entraîné a été fine-tuné. L'évaluation de ce dernier a été effectuée en comparant ses scores F1 sur deux ensembles de données : d'une part, la partition de validation du jeu de données public utilisé pour l'entraînement, et d'autre part, un corpus de test généré par le LLM à partir de nos documents locaux.
 
 ## État de l’art
 
@@ -9,7 +10,7 @@
 
 #### Contexte de l’article
 
-L'article introduit le Stanford Question Answering Dataset (SQuAD), un ensemble de données destiné à la compréhension de lecture par des machines (Reading Comprehension - RC). Les auteurs soulignent qu'au moment de la publication, les ensembles de données existants pour la RC présentaient des limitations : soit ils étaient de haute qualité mais trop petits pour entraîner des modèles gourmands en données, soit ils étaient volumineux mais générés de manière semi-synthétique et ne reflétaient pas la complexité des questions réelles de compréhension de texte. SQuAD a été créé pour combler ce manque en proposant un dataset à la fois vaste et de haute qualité, où les réponses aux questions sont des segments de texte (spans) extraits directement des passages de référence. L'objectif était de fournir une ressource robuste pour entraîner et évaluer des modèles de RC, et de stimuler la recherche dans ce domaine.
+L'article introduit le Stanford Question Answering Dataset (SQuAD), un ensemble de données destiné à la compréhension de lecture par des machines (Reading Comprehension, RC). Les auteurs soulignent qu'au moment de la publication, les ensembles de données existants pour la RC présentaient des limitations : soit ils étaient de haute qualité mais trop petits pour entraîner des modèles gourmands en données, soit ils étaient volumineux mais générés de manière semi-synthétique et ne reflétaient pas la complexité des questions réelles de compréhension de texte. SQuAD a été créé pour combler ce manque en proposant un dataset à la fois vaste et de haute qualité, où les réponses aux questions sont des segments de texte (spans) extraits directement des passages de référence. L'objectif était de fournir une ressource robuste pour entraîner et évaluer des modèles de RC, et de stimuler la recherche dans ce domaine.
 
 #### Expérimentations
 
@@ -112,7 +113,9 @@ Dans un premier temps, j'ai tenté d'entraîner le modèle avec mon propre jeu d
 
 ## Perspectives d’amélioration
 
-[...]
+Avec davantage de ressources, tant budgétaires que matérielles, plusieurs améliorations pourraient être envisagées pour perfectionner l'ensemble du flux de travail. Il serait possible d'exploiter des jeux de données plus volumineux, d'utiliser des modèles pré-entraînés de plus grande taille, ainsi que des API de LLM et des technologies OCR plus performantes. Cela permettrait, par exemple, de générer rapidement des paires question-réponse à partir d'un grand nombre de documents locaux, constituant ainsi un corpus d'entraînement comptant potentiellement des dizaines de milliers d'entrées. De plus, des ressources faciliteraient la comparaison des performances de différents modèles.
+
+Avec plus de temps et une expertise approfondie, il serait pertinent d'explorer plus en détail les stratégies de segmentation (chunking) proposées par divers frameworks. Une autre piste consisterait à développer un algorithme personnalisé pour nettoyer plus efficacement les textes Markdown complexes issus de l'OCR, afin d'optimiser la qualité des données en entrée du LLM et du modèle de QA.
 
 
 ## Difficultés rencontrées pendant le projet
@@ -146,3 +149,4 @@ La génération de données avec les API LLM, bien que gérable pour la quantit�
 
 ## Conclusion
 
+En conclusion, ce projet a exploré la chaîne complète de développement d'un système de questions-réponses en français, de la création de données synthétiques à l'ajustement fin et l'évaluation d'un modèle. Le pipeline de génération de données (OCR -> chunking -> LLM -> corpus structuré) a permis de produire un ensemble de paires QA à partir de documents locaux. Le modèle `distilbert-base-multilingual-cased`, après fine-tuning sur une fraction du dataset `CATIE-AQ/frenchQA`, a atteint un score F1 de 0.4152 sur la partition de validation de ce dernier, et de 0.3769 sur notre corpus généré. Ces résultats, obtenus malgré les défis liés à la qualité des données OCR et aux contraintes de ressources, soulignent le potentiel de cette approche. Les difficultés rencontrées et les pistes d'amélioration identifiées ouvrent la voie à de futurs travaux pour affiner la qualité des données générées et optimiser les performances des modèles de QA en français.
